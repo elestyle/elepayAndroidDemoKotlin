@@ -1,0 +1,249 @@
+package jp.elestyle.androidapp.elepaydemoapp.ui
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.os.Bundle
+import android.util.Log
+import android.widget.Button
+import android.widget.Switch
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.afollestad.materialdialogs.MaterialDialog
+import jp.elestyle.androidapp.elepay.ElePayError
+import jp.elestyle.androidapp.elepaydemoapp.R
+import jp.elestyle.androidapp.elepaydemoapp.data.SupportedPaymentMethod
+import jp.elestyle.androidapp.elepaydemoapp.ui.adapter.PaymentMethodListAdapter
+import jp.elestyle.androidapp.elepaydemoapp.ui.adapter.PaymentMethodListAdapterListener
+import jp.elestyle.androidapp.elepaydemoapp.ui.dialog.PermissionRequestDialog
+import jp.elestyle.androidapp.elepaydemoapp.utils.PaymentManager
+import jp.elestyle.androidapp.elepaydemoapp.utils.PaymentResultHandler
+import org.json.JSONException
+import org.json.JSONObject
+import java.io.IOException
+
+class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
+
+    private val tag: String = "PaymentActivity"
+
+    // -----------------------------------------------------------------
+    //
+    //                   /aaaaaaaaa\
+    //                  d'          `b
+    //                  8  ,aaa,      "Y888a     ,aaaa,     ,aaa,  ,aa,
+    //                  8  8' `8          "88baadP""""YbaaadP"""YbdP""Yb
+    //                  8  8   8             """        """      ""    8b
+    //                  8  8, ,8         ,aaaaaaaaaaaaaaaaaaaaaaaaaaa88P
+    //                  8  `"""'      ,d8""
+    //                   \           /
+    //                    \aaaaaaaaa/
+    //
+    // Replace your keys here.
+    // -----------------------------------------------------------------
+    private val testModeKey = PaymentManager.INVALID_TEST_KEY
+    private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
+    // Change this url to your own server to request charge object.
+    private val paymentUrl = PaymentManager.DEFAULT_PAYMENT_URL
+
+    private lateinit var paymentMethodIndicator: TextView
+    private lateinit var progressDialog: MaterialDialog
+    private lateinit var testModeSwitch: Switch
+    private lateinit var paymentMethodListView: RecyclerView
+
+    private lateinit var paymentManager: PaymentManager
+    private lateinit var amount: String
+    private var paymentMethod: SupportedPaymentMethod = SupportedPaymentMethod.CREDIT_CARD
+    private val paymentMethodListAdapterListener = object : PaymentMethodListAdapterListener {
+        override fun onSelectPaymentMethod(method: SupportedPaymentMethod) {
+            Log.d(tag, "selected ${method.rawValue}")
+            selectPaymentMethod(method)
+        }
+    }
+
+    companion object {
+        const val PREFS_NAME = "ElepayDemoAppPrefs"
+        const val INTENT_KEY_AMOUNT = "amount"
+    }
+
+    @SuppressLint("SetTextI18n")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        amount = intent.extras?.getString(INTENT_KEY_AMOUNT).orEmpty()
+        if (amount.isEmpty()) {
+            Log.d("PaymentActivity", "no amount.")
+            finish()
+        }
+
+        // UI
+
+        setContentView(R.layout.activity_payment)
+
+        progressDialog = MaterialDialog.Builder(this).progress(true, 0).build()
+        val amountView = findViewById<TextView>(R.id.amount)
+        amountView.text = "¥$amount"
+        paymentMethodIndicator = findViewById(R.id.paymentMethodIndicator)
+        paymentMethodListView = findViewById(R.id.paymentMethodListView)
+        paymentMethodListView.adapter = PaymentMethodListAdapter(paymentMethodListAdapterListener)
+        val layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        paymentMethodListView.layoutManager = layoutManager
+        testModeSwitch = findViewById(R.id.testModeSwitch)
+        testModeSwitch.setOnClickListener {
+            Log.d("PaymentActivity", "changed: ${testModeSwitch.isChecked}")
+            saveTestModeSetting(testModeSwitch.isChecked)
+            showTestModeChangingRestartDialog(getString(R.string.test_mode_switch_restart_prompt))
+        }
+        testModeSwitch.isChecked = loadTestModeSetting()
+
+        findViewById<Button>(R.id.payButton).setOnClickListener {
+            progressDialog.setContent(R.string.content_processing)
+            progressDialog.show()
+            performPaying(amount = amount)
+        }
+
+        selectPaymentMethod(SupportedPaymentMethod.CREDIT_CARD)
+
+        // Data
+        setupPaymentManager()
+    }
+
+    override fun onPaySucceeded() {
+        runOnUiThread {
+            progressDialog.dismiss()
+            showResultMessage(message = "Succeeded paying ${paymentMethod.rawValue} $amount")
+        }
+    }
+
+    override fun onPayFailed(error: ElePayError) {
+        runOnUiThread {
+            progressDialog.dismiss()
+        }
+        val message = when (error) {
+            is ElePayError.InvalidPayload -> "${error.errorCode} ${error.message}"
+            is ElePayError.SystemError -> "${error.errorCode} ${error.message}"
+            is ElePayError.AlreadyMakingPayment -> "Already paying: ${error.paymentId}"
+            is ElePayError.PaymentFailure -> "${error.errorCode} ${error.message}"
+            is ElePayError.UnsupportedPaymentMethod -> error.paymentMethod
+            is ElePayError.UninitializedPaymentMethod -> "${error.errorCode} ${error.paymentMethod}"
+            is ElePayError.PermissionRequired -> null
+        }
+        if (message != null) {
+            runOnUiThread { showResultMessage(message) }
+        }
+        if (error is ElePayError.PermissionRequired) {
+            val permissions = error.permissions.joinToString()
+            runOnUiThread {
+                PermissionRequestDialog.show("Permissions", "Permissions are required: $permissions", context = this)
+            }
+        }
+    }
+
+    override fun onPayCanceled() {
+        runOnUiThread {
+            progressDialog.dismiss()
+            showResultMessage(message = "Canceled paying ${paymentMethod.rawValue} $amount")
+        }
+    }
+
+    private fun setupPaymentManager() {
+        val json = try {
+            JSONObject(String(assets.open("config.json").readBytes()))
+        } catch (e: JSONException) {
+            e.printStackTrace()
+            null
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        }
+
+        // You may uses your own server to process the whole payment procedure. Please contact our support for details.
+        // Leave this value to empty to use elepay's server.
+        val baseUrl: String
+        val paymentUrl: String
+        val testModeKey: String
+        val liveModeKey: String
+        if (json != null) {
+            baseUrl = json.optString("baseUrl", "")
+            paymentUrl = json.optString("paymentUrl", this.paymentUrl)
+            testModeKey = json.optString("testModeKey", this.testModeKey)
+            liveModeKey = json.optString("liveModeKey", this.liveModeKey)
+        } else {
+            baseUrl = ""
+            paymentUrl = this.paymentUrl
+            testModeKey = this.testModeKey
+            liveModeKey = this.liveModeKey
+        }
+
+        if (testModeKey == PaymentManager.INVALID_TEST_KEY || liveModeKey == PaymentManager.INVALID_LIVE_KEY) {
+            finishWithoutValidKeys()
+        }
+
+        paymentManager = PaymentManager(
+                isTestMode = testModeSwitch.isChecked,
+                testModeKey = testModeKey,
+                liveModeKey = liveModeKey,
+                baseUrl = baseUrl,
+                paymentUrl = paymentUrl)
+        paymentManager.resultHandler = this
+    }
+
+    private fun performPaying(amount: String) {
+        Log.d(tag, "performPaying: method=${paymentMethod.rawValue}")
+
+        paymentManager.makePayment(amount = amount, method = paymentMethod, activity = this)
+    }
+
+    private fun loadTestModeSetting(): Boolean =
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).run {
+                getBoolean("test_mode", false)
+            }
+
+    @SuppressLint("ApplySharedPref")
+    private fun saveTestModeSetting(testMode: Boolean) {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("test_mode", testMode)
+                .commit()
+    }
+
+    private fun finishWithoutValidKeys() {
+        AlertDialog.Builder(this)
+                .setMessage("No valid keys provided. The keys are generated from elepay's admin page.")
+                .setPositiveButton("OK") { _, _ -> finish() }
+                .create()
+                .show()
+    }
+
+    private fun showResultMessage(message: String) {
+        AlertDialog.Builder(this)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .create()
+                .show()
+    }
+
+    private fun showTestModeChangingRestartDialog(message: String) {
+        AlertDialog.Builder(this)
+                .setMessage(message)
+                .setPositiveButton(R.string.dialog_button_title_ok) { _, _ -> recreate() }
+                .setNegativeButton(R.string.dialog_button_title_cancel) { _, _ ->
+                    // Restore the checked state, since the dialog is showed after the changing.
+                    testModeSwitch.isChecked = !testModeSwitch.isChecked
+                }
+                .setCancelable(false)
+                .create()
+                .show()
+    }
+
+    private fun selectPaymentMethod(paymentMethod: SupportedPaymentMethod) {
+        this.paymentMethod = paymentMethod
+
+        paymentMethod.associatedLocalisedResrouceId().also { resourceId ->
+            if (resourceId > 0) {
+                paymentMethodIndicator.setText(resourceId)
+            }
+        }
+    }
+}

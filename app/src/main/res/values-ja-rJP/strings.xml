@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">iCart Store</string>
+    <string name="payment_method_credit_card">クレジットカード</string>
+    <string name="payment_method_union_pay">UnionPay</string>
+    <string name="payment_method_alipay">Alipay</string>
+    <string name="input_hint_amount">金額</string>
+    <string name="input_error_not_empty">金額を入れてください</string>
+    <string name="button_pay_title">支払</string>
+    <string name="content_processing">処理中…</string>
+    <string name="activity_main_test_mode_title">テストモード</string>
+    <string name="activity_main_text_mode_desc">テストモードをオンにすると、支払の流れをシミュレートし、実際の支払は行いません。</string>
+
+    <string name="dialog_button_title_ok">OK</string>
+    <string name="dialog_button_title_cancel">キャンセル</string>
+    <string name="test_mode_switch_restart_prompt">テストモード変更のために、アプリの再起動が必要です。</string>
+    <string name="payment_method_paypal">PayPal</string>
+</resources>
