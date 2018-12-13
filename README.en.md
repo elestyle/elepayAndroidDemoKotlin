@@ -13,7 +13,19 @@ This is a demo application for the usage of elepay Android SDK.
 
 > Note that the version of the IDE and build tools may increase in the future.
 
+* elepay API key (*test mode key* and *live mode key*)
+> You should request those keys from https://admin.elepay.io
+
 ## Usage
+
+You can either `git clone` or download the zip of the project.
+Open the project in Android Studio and replace the *API key*s in
+app/src/main/java/jp/elestyle/androidapp/elepaydemoapp/ui/PaymentActivity.kt
+
+``` kotlin
+    private val testModeKey = PaymentManager.INVALID_TEST_KEY
+    private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
+```
 
 After running, there are 2 products to demo the payment processing. And each product can be payed by several payment methods.
 However, not all of the payment method work for every product.

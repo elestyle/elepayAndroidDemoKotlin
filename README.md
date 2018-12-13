@@ -13,9 +13,22 @@ elepay Android SDK の Kotlin でご利用のデモアプリケーションで�
 
 > IDEとビルドツールのバージョンは常に更新するので、最新バージョンをご利用するのはおすすめです。
 
+* elepay APIキー (*テストキー*と*本番キー*)
+> 事前に elepay より申請する必要があります。
+
 ## 利用方法
 
 git clone または zip をダウンロードし、解凍したプロジェクトを Android Studio でオープンします。
+elepay 管理システムから申請した*APIキー*を PaymentActivity.kt のキーマークのところに書き換えてください。
+ファイルパス：app/src/main/java/jp/elestyle/androidapp/elepaydemoapp/ui/PaymentActivity.kt
+
+``` kotlin
+    private val testModeKey = PaymentManager.INVALID_TEST_KEY
+    private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
+```
+
+> 書き換えしないと elepay の API をアクセスできませんので、必ずアプリを起動する前に変えてください。
+
 ビルドしたアプリを、デバイスまたは Android Emulater で起動させます。
 
 アプリには二つのデモ商品があります。```Pay``` ボタンを押したら、支払い方法の画面が表示されます。
