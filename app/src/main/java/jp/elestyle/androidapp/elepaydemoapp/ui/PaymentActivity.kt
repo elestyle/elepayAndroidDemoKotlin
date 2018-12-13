@@ -40,12 +40,13 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
     //                   \           /
     //                    \aaaaaaaaa/
     //
-    // Replace your keys here.
-    // -----------------------------------------------------------------
     private val testModeKey = PaymentManager.INVALID_TEST_KEY
     private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
-    // Change this url to your own server to request charge object.
+    // ↑ Replace your keys above
+    // -----------------------------------------------------------------
+
     private val paymentUrl = PaymentManager.DEFAULT_PAYMENT_URL
+    // ↑ Change this url to your own server to request charge object if necessary
 
     private lateinit var paymentMethodIndicator: TextView
     private lateinit var progressDialog: MaterialDialog
