@@ -22,6 +22,7 @@ interface PaymentResultHandler {
 
 class PaymentManager(
         private val isTestMode: Boolean,
+        appScheme: String,
         testModeKey: String,
         liveModeKey: String,
         baseUrl: String = "",
@@ -36,8 +37,6 @@ class PaymentManager(
     }
 
     init {
-        val appScheme = "elepaydemoapp"
-
         ElePay.setup(appScheme = appScheme, appKey = if (isTestMode) testModeKey else liveModeKey, remoteHostBaseUrl = baseUrl)
     }
 

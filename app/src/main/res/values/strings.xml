@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">iCart Store</string>
+    <string name="app_scheme" translatable="false">elepay-icart-kotlin</string>
+
     <string name="btn_credit_card_image_desc" translatable="false">Credit card icon</string>
     <string name="btn_alipay_image_desc" translatable="false">Alipay icon</string>
     <string name="btn_union_pay_image_desc" translatable="false">Union Pay icon</string>

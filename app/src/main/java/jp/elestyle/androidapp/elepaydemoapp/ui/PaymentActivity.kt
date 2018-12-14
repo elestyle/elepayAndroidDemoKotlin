@@ -181,8 +181,11 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
             finishWithoutValidKeys()
         }
 
+        val appScheme = getString(R.string.app_scheme)
+
         paymentManager = PaymentManager(
                 isTestMode = testModeSwitch.isChecked,
+                appScheme = appScheme,
                 testModeKey = testModeKey,
                 liveModeKey = liveModeKey,
                 baseUrl = baseUrl,
