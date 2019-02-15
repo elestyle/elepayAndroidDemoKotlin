@@ -1,5 +1,7 @@
 package jp.elestyle.androidapp.elepaydemoapp.utils
 
+import android.util.Base64
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import jp.elestyle.androidapp.elepay.ElePay
 import jp.elestyle.androidapp.elepay.ElePayConfiguration
@@ -8,12 +10,15 @@ import jp.elestyle.androidapp.elepay.ElePayResult
 import jp.elestyle.androidapp.elepaydemoapp.data.SupportedPaymentMethod
 import org.json.JSONException
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.IOException
+import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
+import java.util.UUID
 
 interface PaymentResultHandler {
     fun onPaySucceeded()
@@ -21,26 +26,32 @@ interface PaymentResultHandler {
     fun onPayCanceled()
 }
 
+data class APIKeys(
+    val publicTestKey: String,
+    val secretTestKey: String,
+    val publicLiveKey: String,
+    val secretLiveKey: String
+)
+
 class PaymentManager(
-        private val isTestMode: Boolean,
-        appScheme: String,
-        testModeKey: String,
-        liveModeKey: String,
-        baseUrl: String = "",
-        private val paymentUrl: String = PaymentManager.DEFAULT_PAYMENT_URL) {
+    private val isTestMode: Boolean,
+    private val apiKeys: APIKeys,
+    baseUrl: String = "",
+    private val paymentUrl: String = PaymentManager.MAKE_CHARGE_DEMO_URL
+) {
 
     var resultHandler: PaymentResultHandler? = null
 
     companion object {
-        const val DEFAULT_PAYMENT_URL = "https://demo.icart.jp/api/orders"
-        const val INVALID_TEST_KEY = "Your test key here. Please use the key generated from elepay admin page."
-        const val INVALID_LIVE_KEY = "Your live key here. Please use the key generated from elepay admin page."
+        const val MAKE_CHARGE_DEMO_URL = "https://api.elepay.io/charges"
+        const val INVALID_KEY = "Please use the key generated from elepay admin page."
     }
 
     init {
         val configuration = ElePayConfiguration(
-                apiKey = if (isTestMode) testModeKey else liveModeKey,
-                remoteHostBaseUrl = baseUrl)
+            apiKey = if (isTestMode) apiKeys.publicTestKey else apiKeys.publicLiveKey,
+            remoteHostBaseUrl = baseUrl
+        )
         ElePay.setup(configuration)
     }
 
@@ -48,41 +59,61 @@ class PaymentManager(
         // NOTE: The charge object should be created from your own server.
         // Here just a demo for requesting charge object.
 
-        // You can change this map value to specify the mode forcibly.
-        val headerFields = mapOf("live-mode" to if (isTestMode) "false" else "true")
+        val authString: String = if (isTestMode) {
+            "Basic ${Base64.encode(
+                (apiKeys.secretTestKey + ":").toByteArray(), Base64.NO_WRAP
+            ).toString(Charsets.UTF_8)}"
+        } else {
+            "Basic ${Base64.encode(
+                (apiKeys.secretLiveKey + ":").toByteArray(), Base64.NO_WRAP
+            ).toString(Charsets.UTF_8)}"
+        }
+        val headerFields = mapOf("Authorization" to authString)
         val params = JSONObject().apply {
             put("paymentMethod", method.rawValue)
             put("amount", amount)
+            put("orderNo", UUID.randomUUID().toString())
+            put("description", "iCart Store Android app charge")
         }
-        Thread(POSTJsonRequester(
+        Thread(
+            POSTJsonRequester(
                 url = paymentUrl, headerFields = headerFields, params = params, resultHandler = { result ->
-            when (result) {
-                is RequestResult.Error ->
-                    resultHandler?.onPayFailed(ElePayError.SystemError(errorCode = 1111, message = "Failed creating charge object."))
-                is RequestResult.JSONResult ->
-                    ElePay.processPayment(chargeData = result.jsonObject, fromActivity = activity) { payResult ->
-                        when (payResult) {
-                            is ElePayResult.Succeeded -> resultHandler?.onPaySucceeded()
-                            is ElePayResult.Failed -> resultHandler?.onPayFailed(error = payResult.error)
-                            is ElePayResult.Canceled -> resultHandler?.onPayCanceled()
-                        }
+                    when (result) {
+                        is RequestResult.Error ->
+                            resultHandler?.onPayFailed(
+                                ElePayError.SystemError(
+                                    errorCode = 1111,
+                                    message = result.message
+                                )
+                            )
+                        is RequestResult.JSONResult ->
+                            ElePay.processPayment(
+                                chargeData = result.jsonObject,
+                                fromActivity = activity
+                            ) { payResult ->
+                                when (payResult) {
+                                    is ElePayResult.Succeeded -> resultHandler?.onPaySucceeded()
+                                    is ElePayResult.Failed -> resultHandler?.onPayFailed(error = payResult.error)
+                                    is ElePayResult.Canceled -> resultHandler?.onPayCanceled()
+                                }
+                            }
                     }
-            }
 
-        })).start()
+                })
+        ).start()
     }
 }
 
 private sealed class RequestResult {
     class JSONResult(val jsonObject: JSONObject) : RequestResult()
-    class Error : RequestResult()
+    class Error(val message: String) : RequestResult()
 }
 
 private class POSTJsonRequester(
-        val url: String,
-        val headerFields: Map<String, String>,
-        val params: JSONObject,
-        val resultHandler: (RequestResult) -> Unit
+    val url: String,
+    val headerFields: Map<String, String>,
+    val params: JSONObject,
+    val resultHandler: (RequestResult) -> Unit
 ) : Runnable {
 
     override fun run() {
@@ -105,15 +136,41 @@ private class POSTJsonRequester(
             writer.close()
             outputStream.close()
 
-            val json = JSONObject(String(conn.inputStream.readBytes()))
-            resultHandler(RequestResult.JSONResult(jsonObject = json))
+            if (conn.errorStream != null) {
+                handleError(conn)
+            } else {
+                val json = JSONObject(String(conn.inputStream.readBytes()))
+                resultHandler(RequestResult.JSONResult(jsonObject = json))
+            }
         } catch (e: MalformedURLException) {
-            resultHandler(RequestResult.Error())
+            resultHandler(RequestResult.Error(e.localizedMessage))
         } catch (e: IOException) {
             e.printStackTrace()
-            resultHandler(RequestResult.Error())
+            resultHandler(RequestResult.Error(e.localizedMessage))
         } catch (e: JSONException) {
-            resultHandler(RequestResult.Error())
+            resultHandler(RequestResult.Error(e.localizedMessage))
         }
+    }
+
+    private fun handleError(conn: HttpURLConnection) {
+        var rawErrorStr = ""
+        try {
+            BufferedReader(InputStreamReader(conn.errorStream)).also {
+                var line: String?
+                do {
+                    line = it.readLine()
+                    rawErrorStr += line
+                } while (line != null)
+            }
+        } catch (e: Exception) {
+            rawErrorStr = e.toString()
+        }
+        Log.d("PaymentManager", rawErrorStr)
+        val jsonError = try {
+            JSONObject(rawErrorStr)
+        } catch (e: Exception){
+            JSONObject()
+        }
+        resultHandler(RequestResult.Error(jsonError.optString("message", "")))
     }
 }

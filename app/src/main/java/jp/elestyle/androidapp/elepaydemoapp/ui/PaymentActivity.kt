@@ -18,6 +18,7 @@ import jp.elestyle.androidapp.elepaydemoapp.data.SupportedPaymentMethod
 import jp.elestyle.androidapp.elepaydemoapp.ui.adapter.PaymentMethodListAdapter
 import jp.elestyle.androidapp.elepaydemoapp.ui.adapter.PaymentMethodListAdapterListener
 import jp.elestyle.androidapp.elepaydemoapp.ui.dialog.PermissionRequestDialog
+import jp.elestyle.androidapp.elepaydemoapp.utils.APIKeys
 import jp.elestyle.androidapp.elepaydemoapp.utils.PaymentManager
 import jp.elestyle.androidapp.elepaydemoapp.utils.PaymentResultHandler
 import org.json.JSONException
@@ -40,12 +41,17 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
     //                   \           /
     //                    \aaaaaaaaa/
     //
-    private val testModeKey = PaymentManager.INVALID_TEST_KEY
-    private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
+    private val testModePublicKey = PaymentManager.INVALID_KEY
+    private val liveModePublicKey = PaymentManager.INVALID_KEY
+    // The following keys are used to generate charge data.
+    // You may consider create your charge data from your server for payment management.
+    // So these keys may not live here.
+    private val testModeSecretKey = PaymentManager.INVALID_KEY
+    private val liveModeSecretKey = PaymentManager.INVALID_KEY
     // ↑ Replace your keys above
     // -----------------------------------------------------------------
 
-    private val paymentUrl = PaymentManager.DEFAULT_PAYMENT_URL
+    private val paymentUrl = PaymentManager.MAKE_CHARGE_DEMO_URL
     // ↑ Change this url to your own server to request charge object if necessary
 
     private lateinit var paymentMethodIndicator: TextView
@@ -136,7 +142,11 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
         if (error is ElePayError.PermissionRequired) {
             val permissions = error.permissions.joinToString()
             runOnUiThread {
-                PermissionRequestDialog.show("Permissions", "Permissions are required: $permissions", context = this)
+                PermissionRequestDialog.show(
+                    "Permissions",
+                    "Permissions are required: $permissions",
+                    context = this
+                )
             }
         }
     }
@@ -163,33 +173,45 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
         // Leave this value to empty to use elepay's server.
         val baseUrl: String
         val paymentUrl: String
-        val testModeKey: String
-        val liveModeKey: String
+        val testPubKey: String
+        val livePubKey: String
+        val testSecKey: String
+        val liveSecKey: String
         if (json != null) {
             baseUrl = json.optString("baseUrl", "")
             paymentUrl = json.optString("paymentUrl", this.paymentUrl)
-            testModeKey = json.optString("testModeKey", this.testModeKey)
-            liveModeKey = json.optString("liveModeKey", this.liveModeKey)
+            testPubKey = json.optString("pk_test", this.testModePublicKey)
+            livePubKey = json.optString("pk_live", this.liveModePublicKey)
+            testSecKey = json.optString("sk_test", this.testModeSecretKey)
+            liveSecKey = json.optString("sk_live", this.liveModeSecretKey)
         } else {
             baseUrl = ""
             paymentUrl = this.paymentUrl
-            testModeKey = this.testModeKey
-            liveModeKey = this.liveModeKey
+            testPubKey = this.testModePublicKey
+            livePubKey = this.liveModePublicKey
+            testSecKey = this.testModeSecretKey
+            liveSecKey = this.liveModeSecretKey
         }
 
-        if (testModeKey == PaymentManager.INVALID_TEST_KEY || liveModeKey == PaymentManager.INVALID_LIVE_KEY) {
+        if (testPubKey == PaymentManager.INVALID_KEY
+            || livePubKey == PaymentManager.INVALID_KEY
+            || testSecKey == PaymentManager.INVALID_KEY
+            || liveSecKey == PaymentManager.INVALID_KEY) {
             finishWithoutValidKeys()
         }
 
-        val appScheme = getString(R.string.app_scheme)
-
+        val keys = APIKeys(
+            publicLiveKey = livePubKey,
+            secretLiveKey = liveSecKey,
+            publicTestKey = testPubKey,
+            secretTestKey = testSecKey
+        )
         paymentManager = PaymentManager(
-                isTestMode = testModeSwitch.isChecked,
-                appScheme = appScheme,
-                testModeKey = testModeKey,
-                liveModeKey = liveModeKey,
-                baseUrl = baseUrl,
-                paymentUrl = paymentUrl)
+            isTestMode = testModeSwitch.isChecked,
+            apiKeys = keys,
+            baseUrl = baseUrl,
+            paymentUrl = paymentUrl
+        )
         paymentManager.resultHandler = this
     }
 
@@ -200,45 +222,45 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
     }
 
     private fun loadTestModeSetting(): Boolean =
-            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).run {
-                getBoolean("test_mode", false)
-            }
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).run {
+            getBoolean("test_mode", false)
+        }
 
     @SuppressLint("ApplySharedPref")
     private fun saveTestModeSetting(testMode: Boolean) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("test_mode", testMode)
-                .commit()
+            .edit()
+            .putBoolean("test_mode", testMode)
+            .commit()
     }
 
     private fun finishWithoutValidKeys() {
         AlertDialog.Builder(this)
-                .setMessage("No valid keys provided. The keys are generated from elepay's admin page.")
-                .setPositiveButton("OK") { _, _ -> finish() }
-                .create()
-                .show()
+            .setMessage("No valid keys provided. The keys are generated from elepay's admin page.")
+            .setPositiveButton("OK") { _, _ -> finish() }
+            .create()
+            .show()
     }
 
     private fun showResultMessage(message: String) {
         AlertDialog.Builder(this)
-                .setMessage(message)
-                .setPositiveButton("OK", null)
-                .create()
-                .show()
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .create()
+            .show()
     }
 
     private fun showTestModeChangingRestartDialog(message: String) {
         AlertDialog.Builder(this)
-                .setMessage(message)
-                .setPositiveButton(R.string.dialog_button_title_ok) { _, _ -> recreate() }
-                .setNegativeButton(R.string.dialog_button_title_cancel) { _, _ ->
-                    // Restore the checked state, since the dialog is showed after the changing.
-                    testModeSwitch.isChecked = !testModeSwitch.isChecked
-                }
-                .setCancelable(false)
-                .create()
-                .show()
+            .setMessage(message)
+            .setPositiveButton(R.string.dialog_button_title_ok) { _, _ -> recreate() }
+            .setNegativeButton(R.string.dialog_button_title_cancel) { _, _ ->
+                // Restore the checked state, since the dialog is showed after the changing.
+                testModeSwitch.isChecked = !testModeSwitch.isChecked
+            }
+            .setCancelable(false)
+            .create()
+            .show()
     }
 
     private fun selectPaymentMethod(paymentMethod: SupportedPaymentMethod) {
