@@ -18,8 +18,8 @@ android {
         applicationId "jp.elestyle.androidapp.elepaydemoapp"
         minSdkVersion 21
         targetSdkVersion 28
-        versionCode 13
-        versionName "1.4"
+        versionCode 14
+        versionName "1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
