@@ -22,7 +22,8 @@ class PaymentMethodListAdapter(private val listener: PaymentMethodListAdapterLis
             PaymentMethodItemData(R.mipmap.ic_credit_card, SupportedPaymentMethod.CREDIT_CARD),
             PaymentMethodItemData(R.drawable.ic_alipay, SupportedPaymentMethod.ALIPAY),
             PaymentMethodItemData(R.mipmap.ic_union_pay, SupportedPaymentMethod.UNION_PAY),
-            PaymentMethodItemData(R.mipmap.ic_paypal_logo_200px, SupportedPaymentMethod.PAYPAL)
+            PaymentMethodItemData(R.mipmap.ic_paypal_logo_200px, SupportedPaymentMethod.PAYPAL),
+            PaymentMethodItemData(R.mipmap.ic_linepay, SupportedPaymentMethod.LINE_PAY)
     )
     private var selectedPosition = 0
 

@@ -2,6 +2,7 @@ package jp.elestyle.androidapp.elepaydemoapp.utils
 
 import androidx.appcompat.app.AppCompatActivity
 import jp.elestyle.androidapp.elepay.ElePay
+import jp.elestyle.androidapp.elepay.ElePayConfiguration
 import jp.elestyle.androidapp.elepay.ElePayError
 import jp.elestyle.androidapp.elepay.ElePayResult
 import jp.elestyle.androidapp.elepaydemoapp.data.SupportedPaymentMethod
@@ -37,7 +38,10 @@ class PaymentManager(
     }
 
     init {
-        ElePay.setup(appScheme = appScheme, appKey = if (isTestMode) testModeKey else liveModeKey, remoteHostBaseUrl = baseUrl)
+        val configuration = ElePayConfiguration(
+                apiKey = if (isTestMode) testModeKey else liveModeKey,
+                remoteHostBaseUrl = baseUrl)
+        ElePay.setup(configuration)
     }
 
     fun makePayment(amount: String, method: SupportedPaymentMethod, activity: AppCompatActivity) {

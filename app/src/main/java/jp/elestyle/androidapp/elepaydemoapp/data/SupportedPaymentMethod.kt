@@ -8,7 +8,7 @@ enum class SupportedPaymentMethod(val rawValue: String) {
     CREDIT_CARD("creditcard"),
     UNION_PAY("unionpay"),
     PAYPAL("paypal"),
-    GOOGLE_PAY("google");
+    LINE_PAY("linepay");
 
     companion object {
         fun from(string: String): SupportedPaymentMethod? = when (string.toLowerCase()) {
@@ -17,7 +17,7 @@ enum class SupportedPaymentMethod(val rawValue: String) {
             "credit card", "creditcard" -> CREDIT_CARD
             "union pay", "unionpay" -> UNION_PAY
             "paypal" -> PAYPAL
-            "google pay", "googlepay" -> GOOGLE_PAY
+            "linepay", "line" -> LINE_PAY
             else -> null
         }
     }
@@ -28,6 +28,7 @@ enum class SupportedPaymentMethod(val rawValue: String) {
         CREDIT_CARD -> R.string.payment_method_credit_card
         UNION_PAY -> R.string.payment_method_union_pay
         PAYPAL -> R.string.payment_method_paypal
+        LINE_PAY -> R.string.payment_method_linepay
         else -> 0
     }
 }
