@@ -20,11 +20,16 @@ elepay Android SDK の Kotlin でご利用のデモアプリケーションで�
 
 git clone または zip をダウンロードし、解凍したプロジェクトを Android Studio でオープンします。
 elepay 管理システムから申請した*APIキー*を PaymentActivity.kt のキーマークのところに書き換えてください。
-ファイルパス：app/src/main/java/jp/elestyle/androidapp/elepaydemoapp/ui/PaymentActivity.kt
+> ファイルパス：app/src/main/java/jp/elestyle/androidapp/elepaydemoapp/ui/PaymentActivity.kt
 
 ``` kotlin
-    private val testModeKey = PaymentManager.INVALID_TEST_KEY
-    private val liveModeKey = PaymentManager.INVALID_LIVE_KEY
+    private val testModePublicKey = PaymentManager.INVALID_KEY
+    private val liveModePublicKey = PaymentManager.INVALID_KEY
+    // The following keys are used to generate charge data.
+    // You may consider create your charge data from your server for payment management.
+    // So these keys may not live here.
+    private val testModeSecretKey = PaymentManager.INVALID_KEY
+    private val liveModeSecretKey = PaymentManager.INVALID_KEY
 ```
 
 > 書き換えしないと elepay の API をアクセスできませんので、必ずアプリを起動する前に変えてください。
