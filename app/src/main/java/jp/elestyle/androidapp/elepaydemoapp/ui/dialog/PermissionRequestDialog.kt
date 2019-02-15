@@ -1,7 +1,6 @@
 package jp.elestyle.androidapp.elepaydemoapp.ui.dialog
 
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -18,13 +17,13 @@ object PermissionRequestDialog {
         AlertDialog.Builder(context, R.style.Theme_AppCompat_Light_Dialog)
                 .setTitle(title)
                 .setMessage(message)
-                .setPositiveButton("Settings", DialogInterface.OnClickListener { _, _ ->
+                .setPositiveButton("Settings") { _, _ ->
                     val intent = Intent()
                     intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
                     val uri = Uri.fromParts("package", context.packageName, null)
                     intent.data = uri
                     context.startActivity(intent)
-                })
+                }
                 .setNegativeButton("Cancel") { _, _ -> }
                 .show()
     }
