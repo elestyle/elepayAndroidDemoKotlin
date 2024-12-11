@@ -11,8 +11,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.afollestad.materialdialogs.MaterialDialog
-import jp.elestyle.androidapp.elepay.ElePayError
+import jp.elestyle.androidapp.elepay.ElepayError
 import jp.elestyle.androidapp.elepaydemoapp.R
 import jp.elestyle.androidapp.elepaydemoapp.data.SupportedPaymentMethod
 import jp.elestyle.androidapp.elepaydemoapp.ui.adapter.PaymentMethodListAdapter
@@ -43,6 +42,7 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
     //
     private val testModePublicKey = PaymentManager.INVALID_KEY
     private val liveModePublicKey = PaymentManager.INVALID_KEY
+
     // The following keys are used to generate charge data.
     // You may consider create your charge data from your server for payment management.
     // So these keys may not live here.
@@ -55,7 +55,7 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
     // ↑ Change this url to your own server to request charge object if necessary
 
     private lateinit var paymentMethodIndicator: TextView
-    private lateinit var progressDialog: MaterialDialog
+//    private lateinit var progressDialog: MaterialDialog
     private lateinit var testModeSwitch: Switch
     private lateinit var paymentMethodListView: RecyclerView
 
@@ -88,7 +88,7 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
 
         setContentView(R.layout.activity_payment)
 
-        progressDialog = MaterialDialog.Builder(this).progress(true, 0).build()
+//        progressDialog = MaterialDialog.Builder(this).progress(true, 0).build()
         val amountView = findViewById<TextView>(R.id.amount)
         amountView.text = "¥$amount"
         paymentMethodIndicator = findViewById(R.id.paymentMethodIndicator)
@@ -105,8 +105,8 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
         testModeSwitch.isChecked = loadTestModeSetting()
 
         findViewById<Button>(R.id.payButton).setOnClickListener {
-            progressDialog.setContent(R.string.content_processing)
-            progressDialog.show()
+//            progressDialog.setContent(R.string.content_processing)
+//            progressDialog.show()
             performPaying(amount = amount)
         }
 
@@ -118,28 +118,29 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
 
     override fun onPaySucceeded() {
         runOnUiThread {
-            progressDialog.dismiss()
+//            progressDialog.dismiss()
             showResultMessage(message = "Succeeded paying ${paymentMethod.rawValue} $amount")
         }
     }
 
-    override fun onPayFailed(error: ElePayError) {
+    override fun onPayFailed(error: ElepayError) {
         runOnUiThread {
-            progressDialog.dismiss()
+//            progressDialog.dismiss()
         }
         val message = when (error) {
-            is ElePayError.InvalidPayload -> "${error.errorCode} ${error.message}"
-            is ElePayError.SystemError -> "${error.errorCode} ${error.message}"
-            is ElePayError.AlreadyMakingPayment -> "Already paying: ${error.paymentId}"
-            is ElePayError.PaymentFailure -> "${error.errorCode} ${error.message}"
-            is ElePayError.UnsupportedPaymentMethod -> error.paymentMethod
-            is ElePayError.UninitializedPaymentMethod -> "${error.errorCode} ${error.paymentMethod}"
-            is ElePayError.PermissionRequired -> null
+            is ElepayError.InvalidPayload -> "${error.errorCode} ${error.message}"
+            is ElepayError.SystemError -> "${error.errorCode} ${error.message}"
+            is ElepayError.AlreadyMakingPayment -> "Already paying: ${error.paymentId}"
+            is ElepayError.PaymentFailure -> "${error.errorCode} ${error.message}"
+            is ElepayError.UnsupportedPaymentMethod -> error.paymentMethod
+            is ElepayError.UninitializedPaymentMethod -> "${error.errorCode} ${error.paymentMethod}"
+            is ElepayError.PermissionRequired -> null
+            is ElepayError.SDKNotSetup -> TODO()
         }
         if (message != null) {
             runOnUiThread { showResultMessage(message) }
         }
-        if (error is ElePayError.PermissionRequired) {
+        if (error is ElepayError.PermissionRequired) {
             val permissions = error.permissions.joinToString()
             runOnUiThread {
                 PermissionRequestDialog.show(
@@ -153,7 +154,7 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
 
     override fun onPayCanceled() {
         runOnUiThread {
-            progressDialog.dismiss()
+//            progressDialog.dismiss()
             showResultMessage(message = "Canceled paying ${paymentMethod.rawValue} $amount")
         }
     }
@@ -196,7 +197,8 @@ class PaymentActivity : AppCompatActivity(), PaymentResultHandler {
         if (testPubKey == PaymentManager.INVALID_KEY
             || livePubKey == PaymentManager.INVALID_KEY
             || testSecKey == PaymentManager.INVALID_KEY
-            || liveSecKey == PaymentManager.INVALID_KEY) {
+            || liveSecKey == PaymentManager.INVALID_KEY
+        ) {
             finishWithoutValidKeys()
         }
 
